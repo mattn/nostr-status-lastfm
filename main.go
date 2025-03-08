@@ -31,6 +31,49 @@ var postRelays = []string{
 	"wss://nostr.compile-error.net",
 }
 
+func publishEvent(nsec string, content string) error {
+	var sk string
+	var pub string
+	var err error
+	if _, s, err := nip19.Decode(nsec); err != nil {
+		log.Fatal(err)
+	} else {
+		sk = s.(string)
+	}
+	if pub, err = nostr.GetPublicKey(sk); err != nil {
+		return err
+	}
+
+	var ev nostr.Event
+	ev.PubKey = pub
+	ev.Content = content
+	ev.CreatedAt = nostr.Now()
+	ev.Tags = nostr.Tags{
+		nostr.Tag{"d", "music"},
+		nostr.Tag{"expiration", fmt.Sprint(time.Now().Add(5 * time.Minute).Unix())},
+		nostr.Tag{"r", "spotify:search:" + url.QueryEscape(content)},
+	}
+	ev.Kind = nostr.KindUserStatuses
+	if err := ev.Sign(sk); err != nil {
+		log.Fatal(err)
+	}
+
+	for _, r := range postRelays {
+		log.Println("publishing", r)
+		relay, err := nostr.RelayConnect(context.Background(), r)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		err = relay.Publish(context.Background(), ev)
+		if err != nil {
+			log.Println(err)
+		}
+		relay.Close()
+	}
+	return nil
+}
+
 func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
@@ -52,12 +95,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	log.Println("version", version)
+
 	nsec := os.Getenv("BOT_NSEC")
 	if nsec == "" {
 		log.Fatal("BOT_NSEC is required")
 	}
-
-	log.Println("version", version)
 
 	ctx := context.Background()
 	sa := option.WithCredentialsFile(firestoreJsonFile)
@@ -78,7 +121,7 @@ func main() {
 	}
 	var lastStatus string
 	if v, ok := r.Data()["status"]; ok {
-		lastStatus = v.(string)
+		lastStatus, _ = v.(string)
 	}
 
 	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
@@ -111,42 +154,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var sk string
-	var pub string
-	if _, s, err := nip19.Decode(nsec); err != nil {
+	if err = publishEvent(nsec, status); err != nil {
 		log.Fatal(err)
-	} else {
-		sk = s.(string)
-	}
-	if pub, err = nostr.GetPublicKey(sk); err != nil {
-		log.Fatal(err)
-	}
-
-	var ev nostr.Event
-	ev.PubKey = pub
-	ev.Content = status
-	ev.CreatedAt = nostr.Now()
-	ev.Tags = nostr.Tags{
-		nostr.Tag{"d", "music"},
-		nostr.Tag{"expiration", fmt.Sprint(time.Now().Add(5 * time.Minute).Unix())},
-		nostr.Tag{"r", "spotify:search:" + url.QueryEscape(status)},
-	}
-	ev.Kind = nostr.KindUserStatuses
-	if err := ev.Sign(sk); err != nil {
-		log.Fatal(err)
-	}
-
-	for _, r := range postRelays {
-		log.Println("publishing", r)
-		relay, err := nostr.RelayConnect(context.Background(), r)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		err = relay.Publish(context.Background(), ev)
-		if err != nil {
-			log.Println(err)
-		}
-		relay.Close()
 	}
 }
