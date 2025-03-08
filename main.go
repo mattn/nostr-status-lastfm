@@ -63,7 +63,8 @@ func main() {
 	sa := option.WithCredentialsFile(firestoreJsonFile)
 	client, err := firestore.NewClient(ctx, firestoreProjectID, sa)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		os.Exit(1)
 	}
 	defer client.Close()
 
@@ -71,7 +72,8 @@ func main() {
 	r, err := doc.Get(ctx)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {
-			log.Fatalln(err)
+			log.Println(err)
+			os.Exit(1)
 		}
 	}
 	var lastStatus string
@@ -105,7 +107,8 @@ func main() {
 		"status": status,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		os.Exit(1)
 	}
 
 	var sk string
