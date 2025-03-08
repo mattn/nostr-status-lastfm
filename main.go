@@ -14,19 +14,32 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const name = "nostr-status-lastfm"
+
+const version = "0.0.0"
+
+var revision = "HEAD"
+
 func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
 	var lastFmUser string
 	var firestoreJsonFile string
 	var firestoreProjectID string
+	var showVersion bool
 	flag.StringVar(&lastFmApiKey, "lastfm-api-key", os.Getenv("LASTFM_API_KEY"), "LastFM API Key")
 	flag.StringVar(&lastFmApiSecret, "lastfm-api-secret", os.Getenv("LASTFM_API_SECRET"), "LastFM API Secret")
 	flag.StringVar(&lastFmUser, "lastfm-user", os.Getenv("LASTFM_USER"), "LastFM User")
 	flag.StringVar(&firestoreJsonFile, "firestore-json-file", os.Getenv("FIRESTORE_JSON_FILE"), "Firestore JSON file")
 	flag.StringVar(&firestoreProjectID, "firestore-project-id", os.Getenv("FIRESTORE_PROJECT_ID"), "Firestore Project ID")
+	flag.BoolVar(&showVersion, "v", false, "show version")
 
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 	ctx := context.Background()
 	sa := option.WithCredentialsFile(firestoreJsonFile)
 	client, err := firestore.NewClient(ctx, firestoreProjectID, sa)
