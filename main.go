@@ -17,7 +17,7 @@ import (
 
 const name = "nostr-status-lastfm"
 
-const version = "0.0.7"
+const version = "0.0.8"
 
 var revision = "HEAD"
 
