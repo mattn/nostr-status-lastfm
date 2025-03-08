@@ -93,7 +93,7 @@ func main() {
 		if track.NowPlaying == "" {
 			continue
 		}
-		status = fmt.Sprintf("%s - %s\n", track.Artist.Name, track.Name)
+		status = fmt.Sprintf("%s - %s", track.Artist.Name, track.Name)
 		log.Println("status: " + status)
 		break
 	}
