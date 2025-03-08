@@ -9,13 +9,10 @@ import (
 	"os"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/ndyakov/go-lastfm"
-	"google.golang.org/api/option"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/redis/go-redis/v9"
 )
 
 const name = "nostr-status-lastfm"
@@ -78,14 +75,12 @@ func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
 	var lastFmUser string
-	var firestoreJsonFile string
-	var firestoreProjectID string
+	var databaseURL string
 	var showVersion bool
 	flag.StringVar(&lastFmApiKey, "lastfm-api-key", os.Getenv("LASTFM_API_KEY"), "LastFM API Key")
 	flag.StringVar(&lastFmApiSecret, "lastfm-api-secret", os.Getenv("LASTFM_API_SECRET"), "LastFM API Secret")
 	flag.StringVar(&lastFmUser, "lastfm-user", os.Getenv("LASTFM_USER"), "LastFM User")
-	flag.StringVar(&firestoreJsonFile, "firestore-json-file", os.Getenv("FIRESTORE_JSON_FILE"), "Firestore JSON file")
-	flag.StringVar(&firestoreProjectID, "firestore-project-id", os.Getenv("FIRESTORE_PROJECT_ID"), "Firestore Project ID")
+	flag.StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "Redis Database URL")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 
 	flag.Parse()
@@ -103,26 +98,21 @@ func main() {
 	}
 
 	ctx := context.Background()
-	sa := option.WithCredentialsFile(firestoreJsonFile)
-	client, err := firestore.NewClient(ctx, firestoreProjectID, sa)
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
-	defer client.Close()
 
-	doc := client.Collection(firestore.DefaultDatabaseID).Doc("nostr-status-lastfm")
-	r, err := doc.Get(ctx)
+	opt, err := redis.ParseURL(databaseURL)
 	if err != nil {
-		if status.Code(err) != codes.NotFound {
-			log.Println(err)
-			os.Exit(1)
-		}
+		log.Fatal(err)
 	}
+	client := redis.NewClient(opt)
+
+	err = client.FlushDB(ctx).Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var lastStatus string
-	if v, ok := r.Data()["status"]; ok {
-		lastStatus, _ = v.(string)
-	}
+
+	client.Get(ctx, "status").Scan(&lastStatus)
 
 	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
 
@@ -146,9 +136,7 @@ func main() {
 	}
 
 	log.Println("updating...")
-	_, err = doc.Set(ctx, map[string]any{
-		"status": status,
-	})
+	err = client.Set(ctx, "status", status, 0).Err()
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
