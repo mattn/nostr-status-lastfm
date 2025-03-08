@@ -89,11 +89,7 @@ func main() {
 		if track.NowPlaying == "" {
 			continue
 		}
-		curr := fmt.Sprintf("%s - %s\n", track.Artist.Name, track.Name)
-		if curr == lastStatus {
-			continue
-		}
-		status = curr
+		status = fmt.Sprintf("%s - %s\n", track.Artist.Name, track.Name)
 		log.Println(status)
 		break
 	}
@@ -102,6 +98,7 @@ func main() {
 		return
 	}
 
+	log.Println("updating...")
 	_, err = doc.Set(ctx, map[string]any{
 		"status": status,
 	})
@@ -133,6 +130,8 @@ func main() {
 	if err := ev.Sign(sk); err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("publishing...")
 	for _, r := range postRelays {
 		relay, err := nostr.RelayConnect(context.Background(), r)
 		if err != nil {
