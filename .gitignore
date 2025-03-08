@@ -1,0 +1,7 @@
+nostr-status-lastfm
+nostr-status-lastfm.exe
+k8s
+*.sh
+*.bat
+*.cmd
+*.json
