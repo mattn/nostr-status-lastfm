@@ -57,6 +57,8 @@ func main() {
 		log.Fatal("BOT_NSEC is required")
 	}
 
+	log.Println("version", version)
+
 	ctx := context.Background()
 	sa := option.WithCredentialsFile(firestoreJsonFile)
 	client, err := firestore.NewClient(ctx, firestoreProjectID, sa)
@@ -90,7 +92,7 @@ func main() {
 			continue
 		}
 		status = fmt.Sprintf("%s - %s\n", track.Artist.Name, track.Name)
-		log.Println(status)
+		log.Println("status: " + status)
 		break
 	}
 
@@ -131,8 +133,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("publishing...")
 	for _, r := range postRelays {
+		log.Println("publishing", r)
 		relay, err := nostr.RelayConnect(context.Background(), r)
 		if err != nil {
 			log.Println(err)
