@@ -116,7 +116,14 @@ func main() {
 
 	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
 
-	resp, err := api.User.GetRecentTracks(lastFmUser, 0, 1, 0, 0)
+	var resp *lastfm.RecentTracksResponse
+	for range 3 {
+		resp, err = api.User.GetRecentTracks(lastFmUser, 0, 1, 0, 0)
+		if err == nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,7 +143,13 @@ func main() {
 	}
 
 	log.Println("updating...")
-	err = client.Set(ctx, "status", status, 0).Err()
+	for range 3 {
+		err = client.Set(ctx, "status", status, 0).Err()
+		if err == nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
