@@ -136,10 +136,10 @@ func main() {
 			continue
 		}
 		status = fmt.Sprintf("%s - %s", track.Artist.Name, track.Name)
-		log.Println("status: " + status)
 		break
 	}
 
+	log.Println("status: " + status)
 	if status == "" || status == lastStatus {
 		return
 	}
