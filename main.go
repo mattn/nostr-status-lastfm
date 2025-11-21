@@ -107,11 +107,6 @@ func main() {
 	}
 	client := redis.NewClient(opt)
 
-	err = client.FlushDB(ctx).Err()
-	if err != nil {
-		log.Fatal("client.FlushDB:", err)
-	}
-
 	var lastStatus string
 
 	err = client.Get(ctx, "status").Scan(&lastStatus)
