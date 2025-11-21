@@ -114,7 +114,10 @@ func main() {
 
 	var lastStatus string
 
-	client.Get(ctx, "status").Scan(&lastStatus)
+	err = client.Get(ctx, "status").Scan(&lastStatus)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
 
