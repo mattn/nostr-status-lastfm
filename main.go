@@ -26,6 +26,8 @@ var postRelays = []string{
 	"wss://yabu.me",
 	"wss://relay.damus.io",
 	"wss://nostr.compile-error.net",
+	"wss://cagliostr.compile-error.net",
+	"wss://ruby-nostr-relay.compile-error.net",
 }
 
 func publishEvent(nsec string, content string) error {
