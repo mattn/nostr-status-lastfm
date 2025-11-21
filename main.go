@@ -110,7 +110,7 @@ func main() {
 	var lastStatus string
 
 	err = client.Get(ctx, "status").Scan(&lastStatus)
-	if err != nil {
+	if err != nil && err.Error() != "redis: nil" {
 		log.Fatal("client.Get:", err)
 	}
 
