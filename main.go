@@ -103,20 +103,20 @@ func main() {
 
 	opt, err := redis.ParseURL(databaseURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("redis.ParseURL:", err)
 	}
 	client := redis.NewClient(opt)
 
 	err = client.FlushDB(ctx).Err()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.FlushDB:", err)
 	}
 
 	var lastStatus string
 
 	err = client.Get(ctx, "status").Scan(&lastStatus)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client.Get:", err)
 	}
 
 	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
@@ -130,7 +130,7 @@ func main() {
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("api.User.GetRecentTracks:", err)
 	}
 
 	var status string
@@ -142,7 +142,7 @@ func main() {
 		break
 	}
 
-	log.Println("status: " + status)
+	log.Printf("status: %q, lastStatus: %q", status, lastStatus)
 	if status == "" || status == lastStatus {
 		return
 	}
@@ -161,6 +161,6 @@ func main() {
 	}
 
 	if err = publishEvent(nsec, status); err != nil {
-		log.Fatal(err)
+		log.Fatal("publishEvent:", err)
 	}
 }
