@@ -73,16 +73,25 @@ func publishEvent(nsec string, content string) error {
 	return nil
 }
 
+func getenv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}
+
 func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
 	var lastFmUser string
 	var databaseURL string
+	var databaseKey string
 	var showVersion bool
 	flag.StringVar(&lastFmApiKey, "lastfm-api-key", os.Getenv("LASTFM_API_KEY"), "LastFM API Key")
 	flag.StringVar(&lastFmApiSecret, "lastfm-api-secret", os.Getenv("LASTFM_API_SECRET"), "LastFM API Secret")
 	flag.StringVar(&lastFmUser, "lastfm-user", os.Getenv("LASTFM_USER"), "LastFM User")
 	flag.StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "Redis Database URL")
+	flag.StringVar(&databaseKey, "database-key", getenv(os.Getenv("DATABASE_KEY"), "nostr-status-lastfm"), "Redis Database Key")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 
 	flag.Parse()
@@ -109,7 +118,7 @@ func main() {
 
 	var lastStatus string
 
-	err = client.Get(ctx, "nostr-status-lastfm").Scan(&lastStatus)
+	err = client.Get(ctx, databaseKey).Scan(&lastStatus)
 	if err != nil && err.Error() != "redis: nil" {
 		log.Fatal("client.Get:", err)
 	}
@@ -144,7 +153,7 @@ func main() {
 
 	log.Println("updating...")
 	for range 3 {
-		err = client.Set(ctx, "nostr-status-lastfm", status, 0).Err()
+		err = client.Set(ctx, databaseKey, status, 0).Err()
 		if err == nil {
 			break
 		}
