@@ -109,7 +109,7 @@ func main() {
 
 	var lastStatus string
 
-	err = client.Get(ctx, "status").Scan(&lastStatus)
+	err = client.Get(ctx, "nostr-status-lastfm").Scan(&lastStatus)
 	if err != nil && err.Error() != "redis: nil" {
 		log.Fatal("client.Get:", err)
 	}
@@ -144,7 +144,7 @@ func main() {
 
 	log.Println("updating...")
 	for range 3 {
-		err = client.Set(ctx, "status", status, 0).Err()
+		err = client.Set(ctx, "nostr-status-lastfm", status, 0).Err()
 		if err == nil {
 			break
 		}
