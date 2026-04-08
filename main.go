@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -57,19 +58,27 @@ func publishEvent(nsec string, content string) error {
 		log.Fatal(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
 	for _, r := range postRelays {
-		log.Println("publishing", r)
-		relay, err := nostr.RelayConnect(context.Background(), r)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		err = relay.Publish(context.Background(), ev)
-		if err != nil {
-			log.Println(err)
-		}
-		relay.Close()
+		wg.Add(1)
+		go func(r string) {
+			defer wg.Done()
+			log.Println("publishing", r)
+			relay, err := nostr.RelayConnect(ctx, r)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			defer relay.Close()
+			if err := relay.Publish(ctx, ev); err != nil {
+				log.Println(err)
+			}
+		}(r)
 	}
+	wg.Wait()
 	return nil
 }
 
@@ -119,7 +128,7 @@ func main() {
 	var lastStatus string
 
 	err = client.Get(ctx, databaseKey).Scan(&lastStatus)
-	if err != nil && err.Error() != "redis: nil" {
+	if err != nil && err != redis.Nil {
 		log.Fatal("client.Get:", err)
 	}
 
@@ -153,7 +162,7 @@ func main() {
 
 	log.Println("updating...")
 	for range 3 {
-		err = client.Set(ctx, databaseKey, status, 0).Err()
+		err = client.Set(ctx, databaseKey, status, 5*time.Minute).Err()
 		if err == nil {
 			break
 		}
