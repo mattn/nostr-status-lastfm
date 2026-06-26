@@ -33,13 +33,18 @@ var postRelays = []string{
 }
 
 func publishEvent(nsec string, content string) error {
-	var sk string
 	var pub string
 	var err error
-	if _, s, err := nip19.Decode(nsec); err != nil {
-		log.Fatal(err)
-	} else {
-		sk = s.(string)
+	prefix, value, err := nip19.Decode(nsec)
+	if err != nil {
+		return err
+	}
+	if prefix != "nsec" {
+		return fmt.Errorf("expected nsec private key, got %s", prefix)
+	}
+	sk, ok := value.(string)
+	if !ok || sk == "" {
+		return fmt.Errorf("invalid nsec private key")
 	}
 	if pub, err = nostr.GetPublicKey(sk); err != nil {
 		return err
@@ -56,7 +61,7 @@ func publishEvent(nsec string, content string) error {
 	}
 	ev.Kind = nostr.KindUserStatuses
 	if err := ev.Sign(sk); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
