@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -62,6 +63,7 @@ func publishEvent(nsec string, content string) error {
 	defer cancel()
 
 	var wg sync.WaitGroup
+	var published atomic.Int32
 	for _, r := range postRelays {
 		wg.Add(1)
 		go func(r string) {
@@ -75,10 +77,15 @@ func publishEvent(nsec string, content string) error {
 			defer relay.Close()
 			if err := relay.Publish(ctx, ev); err != nil {
 				log.Println(err)
+				return
 			}
+			published.Add(1)
 		}(r)
 	}
 	wg.Wait()
+	if published.Load() == 0 {
+		return fmt.Errorf("failed to publish event to any relay")
+	}
 	return nil
 }
 
