@@ -38,3 +38,25 @@ func TestPublishEventFailsWithoutRelaySuccess(t *testing.T) {
 		t.Fatal("publishEvent returned nil, want error")
 	}
 }
+
+func TestPublishEventReturnsInvalidNsecError(t *testing.T) {
+	if err := publishEvent("not-a-nostr-private-key", "artist - track"); err == nil {
+		t.Fatal("publishEvent returned nil, want error")
+	}
+}
+
+func TestPublishEventRejectsNonPrivateNIP19Key(t *testing.T) {
+	sk := nostr.GeneratePrivateKey()
+	pub, err := nostr.GetPublicKey(sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	npub, err := nip19.EncodePublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := publishEvent(npub, "artist - track"); err == nil {
+		t.Fatal("publishEvent returned nil, want error")
+	}
+}
