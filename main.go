@@ -100,7 +100,7 @@ func main() {
 	flag.StringVar(&lastFmApiSecret, "lastfm-api-secret", os.Getenv("LASTFM_API_SECRET"), "LastFM API Secret")
 	flag.StringVar(&lastFmUser, "lastfm-user", os.Getenv("LASTFM_USER"), "LastFM User")
 	flag.StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "Redis Database URL")
-	flag.StringVar(&databaseKey, "database-key", getenv(os.Getenv("DATABASE_KEY"), "nostr-status-lastfm"), "Redis Database Key")
+	flag.StringVar(&databaseKey, "database-key", getenv("DATABASE_KEY", "nostr-status-lastfm"), "Redis Database Key")
 	flag.BoolVar(&showVersion, "v", false, "show version")
 
 	flag.Parse()
