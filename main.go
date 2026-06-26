@@ -160,6 +160,10 @@ func main() {
 		return
 	}
 
+	if err = publishEvent(nsec, status); err != nil {
+		log.Fatal("publishEvent:", err)
+	}
+
 	log.Println("updating...")
 	for range 3 {
 		err = client.Set(ctx, databaseKey, status, 5*time.Minute).Err()
@@ -171,9 +175,5 @@ func main() {
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
-	}
-
-	if err = publishEvent(nsec, status); err != nil {
-		log.Fatal("publishEvent:", err)
 	}
 }
