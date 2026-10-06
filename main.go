@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -101,6 +102,20 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
+// isTemporaryLastfmError reports whether err is a Last.fm API error that is
+// expected to succeed on a later run.
+func isTemporaryLastfmError(err error) bool {
+	var lerr *lastfm.LastfmErrorResponse
+	if !errors.As(err, &lerr) {
+		return false
+	}
+	switch lerr.Code {
+	case 8, 11, 16, 29: // operation failed, service offline, temporarily unavailable, rate limit
+		return true
+	}
+	return false
+}
+
 func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
@@ -155,6 +170,10 @@ func main() {
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
+		if isTemporaryLastfmError(err) {
+			log.Println("api.User.GetRecentTracks: temporary failure, skipping:", err)
+			return
+		}
 		log.Fatal("api.User.GetRecentTracks:", err)
 	}
 

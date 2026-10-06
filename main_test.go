@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
+	lastfm "github.com/ndyakov/go-lastfm"
 )
 
 func TestGetenv(t *testing.T) {
@@ -58,5 +60,17 @@ func TestPublishEventRejectsNonPrivateNIP19Key(t *testing.T) {
 
 	if err := publishEvent(npub, "artist - track"); err == nil {
 		t.Fatal("publishEvent returned nil, want error")
+	}
+}
+
+func TestIsTemporaryLastfmError(t *testing.T) {
+	if !isTemporaryLastfmError(&lastfm.LastfmErrorResponse{Code: 8, Message: "Operation failed"}) {
+		t.Fatal("code 8 should be temporary")
+	}
+	if isTemporaryLastfmError(&lastfm.LastfmErrorResponse{Code: 6, Message: "User not found"}) {
+		t.Fatal("code 6 should not be temporary")
+	}
+	if isTemporaryLastfmError(errors.New("other")) {
+		t.Fatal("non-lastfm error should not be temporary")
 	}
 }
