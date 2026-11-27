@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"sync"
@@ -116,16 +118,123 @@ func isTemporaryLastfmError(err error) bool {
 	return false
 }
 
+var listenBrainzAPIBase = "https://api.listenbrainz.org"
+
+// temporaryError marks failures that are expected to succeed on a later run.
+type temporaryError struct{ err error }
+
+func (e *temporaryError) Error() string { return e.err.Error() }
+func (e *temporaryError) Unwrap() error { return e.err }
+
+func isTemporaryError(err error) bool {
+	var terr *temporaryError
+	return errors.As(err, &terr) || isTemporaryLastfmError(err)
+}
+
+func retry(f func() (string, error)) (string, error) {
+	var status string
+	var err error
+	for i := range 3 {
+		if i > 0 {
+			time.Sleep(2 * time.Second)
+		}
+		status, err = f()
+		if err == nil {
+			return status, nil
+		}
+	}
+	return "", err
+}
+
+// lastfmNowPlaying returns "artist - track" of the track now playing on
+// Last.fm, or empty string when nothing is playing.
+func lastfmNowPlaying(apiKey, apiSecret, user string) (string, error) {
+	api := lastfm.New(apiKey, apiSecret)
+	resp, err := api.User.GetRecentTracks(user, 0, 1, 0, 0)
+	if err != nil {
+		return "", fmt.Errorf("api.User.GetRecentTracks: %w", err)
+	}
+	for _, track := range resp.RecentTracks {
+		if track.NowPlaying == "" {
+			continue
+		}
+		return fmt.Sprintf("%s - %s", track.Artist.Name, track.Name), nil
+	}
+	return "", nil
+}
+
+type listenBrainzPlayingNow struct {
+	Payload struct {
+		Listens []struct {
+			PlayingNow    bool `json:"playing_now"`
+			TrackMetadata struct {
+				ArtistName string `json:"artist_name"`
+				TrackName  string `json:"track_name"`
+			} `json:"track_metadata"`
+		} `json:"listens"`
+	} `json:"payload"`
+}
+
+// listenBrainzNowPlaying returns "artist - track" of the track now playing on
+// ListenBrainz, or empty string when nothing is playing.
+func listenBrainzNowPlaying(ctx context.Context, user, token string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	u := listenBrainzAPIBase + "/1/user/" + url.PathEscape(user) + "/playing-now"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", name+"/"+version)
+	if token != "" {
+		req.Header.Set("Authorization", "Token "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", &temporaryError{fmt.Errorf("listenbrainz: %w", err)}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("listenbrainz: %s", resp.Status)
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			return "", &temporaryError{err}
+		}
+		return "", err
+	}
+
+	var body listenBrainzPlayingNow
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return "", fmt.Errorf("listenbrainz: %w", err)
+	}
+	for _, l := range body.Payload.Listens {
+		md := l.TrackMetadata
+		if !l.PlayingNow || md.TrackName == "" {
+			continue
+		}
+		if md.ArtistName == "" {
+			return md.TrackName, nil
+		}
+		return fmt.Sprintf("%s - %s", md.ArtistName, md.TrackName), nil
+	}
+	return "", nil
+}
+
 func main() {
 	var lastFmApiKey string
 	var lastFmApiSecret string
 	var lastFmUser string
+	var listenBrainzUser string
+	var listenBrainzToken string
 	var databaseURL string
 	var databaseKey string
 	var showVersion bool
 	flag.StringVar(&lastFmApiKey, "lastfm-api-key", os.Getenv("LASTFM_API_KEY"), "LastFM API Key")
 	flag.StringVar(&lastFmApiSecret, "lastfm-api-secret", os.Getenv("LASTFM_API_SECRET"), "LastFM API Secret")
 	flag.StringVar(&lastFmUser, "lastfm-user", os.Getenv("LASTFM_USER"), "LastFM User")
+	flag.StringVar(&listenBrainzUser, "listenbrainz-user", os.Getenv("LISTENBRAINZ_USER"), "ListenBrainz User (takes precedence over Last.fm)")
+	flag.StringVar(&listenBrainzToken, "listenbrainz-token", os.Getenv("LISTENBRAINZ_TOKEN"), "ListenBrainz User Token (optional)")
 	flag.StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "Redis Database URL")
 	flag.StringVar(&databaseKey, "database-key", getenv("DATABASE_KEY", "nostr-status-lastfm"), "Redis Database Key")
 	flag.BoolVar(&showVersion, "v", false, "show version")
@@ -159,31 +268,25 @@ func main() {
 		log.Fatal("client.Get:", err)
 	}
 
-	api := lastfm.New(lastFmApiKey, lastFmApiSecret)
-
-	var resp *lastfm.RecentTracksResponse
-	for range 3 {
-		resp, err = api.User.GetRecentTracks(lastFmUser, 0, 1, 0, 0)
-		if err == nil {
-			break
-		}
-		time.Sleep(2 * time.Second)
+	var status string
+	switch {
+	case listenBrainzUser != "":
+		status, err = retry(func() (string, error) {
+			return listenBrainzNowPlaying(ctx, listenBrainzUser, listenBrainzToken)
+		})
+	case lastFmUser != "":
+		status, err = retry(func() (string, error) {
+			return lastfmNowPlaying(lastFmApiKey, lastFmApiSecret, lastFmUser)
+		})
+	default:
+		log.Fatal("LISTENBRAINZ_USER or LASTFM_USER is required")
 	}
 	if err != nil {
-		if isTemporaryLastfmError(err) {
-			log.Println("api.User.GetRecentTracks: temporary failure, skipping:", err)
+		if isTemporaryError(err) {
+			log.Println("temporary failure, skipping:", err)
 			return
 		}
-		log.Fatal("api.User.GetRecentTracks:", err)
-	}
-
-	var status string
-	for _, track := range resp.RecentTracks {
-		if track.NowPlaying == "" {
-			continue
-		}
-		status = fmt.Sprintf("%s - %s", track.Artist.Name, track.Name)
-		break
+		log.Fatal(err)
 	}
 
 	log.Printf("status: %q, lastStatus: %q", status, lastStatus)

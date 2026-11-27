@@ -1,6 +1,6 @@
 # nostr-status-lastfm
 
-Update Nostr kind 30315 status via Last.fm scrobble
+Update Nostr kind 30315 status via ListenBrainz or Last.fm scrobble
 
 ## Usage
 
@@ -33,6 +33,12 @@ spec:
             env:
             - name: BOT_NSEC
               value: 'nsec1...'
+            # Use ListenBrainz (takes precedence when set)
+            - name: LISTENBRAINZ_USER
+              value: '...'
+            #- name: LISTENBRAINZ_TOKEN # optional
+            #  value: '...'
+            # Or use Last.fm
             - name: LASTFM_USER
               value: '...'
             - name: LASTFM_API_KEY
@@ -46,7 +52,8 @@ spec:
 ## Requirements
 
 * Nostr account
-* Last.fm account
+* ListenBrainz account or Last.fm account
+  * Last.fm requires Pro for `user.getRecentTracks` from 2026-12-01
 * Redis database
 
 ## License
